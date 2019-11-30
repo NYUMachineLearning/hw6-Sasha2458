@@ -18,6 +18,8 @@ library(tidyverse)
 library(mlbench)
 library(caret)
 library(pROC)
+library(randomForest)
+library(glmnet)
 ```
 
 ## The Breast Cancer Dataset
@@ -85,6 +87,8 @@ control = trainControl(method = "repeatedcv", repeats = 5, classProbs = T, saveP
 svm = train(Class ~ Id + Cl.thickness + Cell.size + Cell.shape + Marg.adhesion + Epith.c.size + Bare.nuclei + Bl.cromatin + Normal.nucleoli +  Mitoses,  data = train_classification, method = "svmRadial", tuneLength = 10, trControl = control)
 
 svm
+
+#there are different svm kernels so you could try several different kinds and see which one predicts the best
 ```
 
 ##Receiver operating characteristic(ROC) curve
@@ -107,4 +111,71 @@ confusionMatrix(svm_test, reference = test_classification$Class)
 
 1. Choose an appropriate machine learning dataset and use SVM with two different kernels. Campare the results. 
 
+
+```{r}
+data <- iris
+data <-  transform(data,Sepal.Length = as.numeric(Sepal.Length), 
+                        Sepal.Width = as.numeric(Sepal.Width),
+                         Petal.Length = as.numeric(Petal.Length),
+                         Petal.Width = as.numeric(Petal.Width))
+
+
+samp_size = floor(0.75 * nrow(data))
+trainpos <- sample(seq_len(nrow(data)), size = samp_size)
+
+train <- data[trainpos, ]
+test <- data[-trainpos, ]
+```
+
+SVM
+```{r}
+set.seed(123)
+ctrl = trainControl(method = "repeatedcv", repeats = 5, classProbs = T, savePredictions = T)
+
+svm = train(Species ~ Sepal.Length + Sepal.Width + Petal.Length + Petal.Width,  data = train, method = "svmLinear", tuneLength = 10, trControl = ctrl)
+
+svmRad = train(Species ~ Sepal.Length + Sepal.Width + Petal.Length + Petal.Width,  data = train, method = "svmRadial", tuneLength = 10, trControl = ctrl)
+
+
+testLin = predict(svm, newdata = test)
+confusionMatrix(svm, reference = test$Class)
+testRad = predict(svmRad, newdata = test)
+confusionMatrix(svmRad, reference = test$Class)
+```
+
 2. Attempt using SVM after using a previously covered feature selection method. Do the results improve? Explain. 
+
+```{r}
+data[is.na(data)] = 0
+cormatrix = cor(data[,1:4]) 
+library(corrplot)
+corrplot(cormatrix, order = "hclust")
+highlycorrelated <- colnames(data[, -9])[findCorrelation(cormatrix, cutoff = 0.7, verbose = TRUE)]
+highlycorrelated
+colnames(data)
+
+sub <- data[, 2:5]
+
+samp = floor(0.75 * nrow(sub))
+part <- sample(seq_len(nrow(sub)), size = samp)
+
+training <- sub[part,]%>%
+  na.omit()
+testing <- sub[-part,]%>%
+  na.omit()
+
+set.seed(123)
+ctrl = trainControl(method = "repeatedcv", repeats = 5, classProbs = T, savePredictions = T)
+
+svm = train(Species ~  Sepal.Width + Petal.Length + Petal.Width,  data = training, method = "svmLinear", tuneLength = 10, trControl = ctrl)
+
+svmRad = train(Species ~  Sepal.Width + Petal.Length + Petal.Width,  data = training, method = "svmRadial", tuneLength = 10, trControl = ctrl)
+
+
+testLin = predict(svm, newdata = testing)
+confusionMatrix(svm, reference = test$Class)
+testRad = predict(svmRad, newdata = testing)
+confusionMatrix(svmRad, reference = test$Class)
+```
+
+After doing a feature selection method, the results do not improve and actually are slightly lower than when using all of the features. 
